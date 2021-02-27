@@ -53,6 +53,9 @@ poblacion <- readRDS("datos/peru-pob2020-departamentos.rds") %>%
   arrange(
     ubigeo,
     grp_edad
+  ) %>%
+  rename(
+    n_pob = pob2020
   )
 
 
@@ -98,21 +101,24 @@ combinado_peru_long <- poblacion %>%
     fallecidos_peru,
     by = c("grp_edad")
   ) %>%
-  select(departamento, grp_edad,
-         pct_pob, pct_positivos, pct_fallecidos) %>%
   pivot_longer(
-    cols = c(starts_with("pct_")),
+    cols = c(starts_with("pct_"), starts_with("n_")),
     names_to = "metrica",
-    values_to = "pct"
+    values_to = "valor"
+  ) %>%
+  separate(
+    col = metrica,
+    into = c("tipo", "dimension"),
+    sep = "_"
   ) %>%
   mutate(
-    metrica = case_when(
-      metrica == "pct_pob" ~ "Población",
-      metrica == "pct_positivos" ~ "Casos Positivos",
-      metrica == "pct_fallecidos" ~ "Fallecidos"
+    dimension = case_when(
+      dimension == "pob" ~ "Población",
+      dimension == "positivos" ~ "Casos Positivos",
+      dimension == "fallecidos" ~ "Fallecidos"
     ),
-    metrica = factor(
-      metrica,
+    dimension = factor(
+      dimension,
       levels = c("Población", "Casos Positivos", "Fallecidos"),
       ordered = TRUE
     )
@@ -123,13 +129,30 @@ combinado_peru_long <- poblacion %>%
     grp_edad
   )
 
+combinado_peru_long_pct <- combinado_peru_long %>%
+  filter(tipo == "pct")
+
+combinado_peru_lbls <- combinado_peru_long %>%
+  filter(tipo == "n") %>%
+  ungroup() %>%
+  group_by(dimension) %>%
+  summarise(
+    n_total = sum(valor)
+  ) %>%
+  mutate(
+    lbl = glue::glue("{dimension} (N: {format(n_total, big.mark = ',')})") %>%
+      str_squish()
+  ) %>%
+  select(dimension, lbl) %>%
+  deframe()
+
 peru <- ggplot(
-  combinado_peru_long,
-  aes(x = pct, y = grp_edad,
-      group = metrica, fill = grp_edad)
+  combinado_peru_long_pct,
+  aes(x = valor, y = grp_edad,
+      group = dimension, fill = grp_edad)
 ) +
   geom_col(show.legend = FALSE) +
-  geom_label(aes(label = sprintf("%.1f%%", 100 * pct)),
+  geom_label(aes(label = sprintf("%.1f%%", 100 * valor)),
              nudge_x = .025, size = 5,
              label.size = 0,
              label.padding = unit(0, "cm"),
@@ -143,7 +166,10 @@ peru <- ggplot(
     subtitle = "Rango de fechas: del 2020-03-06 al 2021-02-23. Población estimada al 2020 (INEI/MINSA).",
     caption = "Fuente: Datos abiertos de positivos y fallecidos por COVID-19 (MINSA)\n@jmcastagnetto, Jesus M. Castagnetto, 2021-02-26"
   ) +
-  facet_wrap(~metrica) +
+  facet_wrap(
+    ~dimension,
+    labeller = labeller(dimension = combinado_peru_lbls)
+  ) +
   ggthemes::theme_few(24) +
   theme(
     panel.grid.major.y = element_line(color = "grey80", linetype = "dotted"),
@@ -154,6 +180,7 @@ peru <- ggplot(
     plot.caption = element_text(family = "Inconsolata"),
     strip.text = element_text(face = "bold")
   )
+#peru
 
 ggsave(
   plot = peru,
@@ -208,8 +235,7 @@ fallecidos_dpto <- fallecidos %>%
     pct_fallecidos = n_fallecidos / sum(n_fallecidos)
   )
 
-
-combinados_dpto <- pob_dpto %>%
+combinados_dpto <- poblacion %>%
   filter(departamento != "PERU") %>%
   left_join(
     positivos_dpto,
@@ -222,20 +248,26 @@ combinados_dpto <- pob_dpto %>%
 
 combinados_dpto_long <- combinados_dpto %>%
   select(departamento, grp_edad,
+         n_pob, n_positivos, n_fallecidos,
          pct_pob, pct_positivos, pct_fallecidos) %>%
   pivot_longer(
-    cols = c(starts_with("pct_")),
+    cols = c(starts_with("pct_"), starts_with("n_")),
     names_to = "metrica",
-    values_to = "pct"
+    values_to = "valor"
+  ) %>%
+  separate(
+    col = metrica,
+    into = c("tipo", "dimension"),
+    sep = "_"
   ) %>%
   mutate(
-    metrica = case_when(
-      metrica == "pct_pob" ~ "Población",
-      metrica == "pct_positivos" ~ "Casos Positivos",
-      metrica == "pct_fallecidos" ~ "Fallecidos"
+    dimension = case_when(
+      dimension == "pob" ~ "Población",
+      dimension == "positivos" ~ "Casos Positivos",
+      dimension == "fallecidos" ~ "Fallecidos"
     ),
-    metrica = factor(
-      metrica,
+    dimension = factor(
+      dimension,
       levels = c("Población", "Casos Positivos", "Fallecidos"),
       ordered = TRUE
     )
@@ -246,16 +278,43 @@ combinados_dpto_long <- combinados_dpto %>%
     grp_edad
   )
 
-mk_comb_plot <- function(df, dpto) {
-  df <- combinados_dpto_long %>%
+combinados_dpto_long_pct <- combinados_dpto_long %>%
+  filter(tipo == "pct")
+
+combinados_dpto_lbls <- combinados_dpto_long %>%
+  filter(tipo == "n") %>%
+  ungroup() %>%
+  group_by(departamento, dimension) %>%
+  summarise(
+    n_total = sum(valor, na.rm = TRUE)
+  ) %>%
+  mutate(
+    lbl = glue::glue("{dimension} (N: {format(n_total, big.mark = ',')})") %>%
+      str_squish()
+  ) %>%
+  select(departamento, dimension, lbl) %>%
+  mutate(
+    dimension = as.character(dimension)
+  ) %>%
+  ungroup()
+
+mk_comb_plot <- function(df, dpto, df_lbls) {
+
+  lbls <- df_lbls %>%
+    filter(departamento == dpto) %>%
+    select(dimension, lbl) %>%
+    deframe()
+
+  df1 <- df %>%
     filter(departamento == dpto)
+
   ggplot(
-    df,
-    aes(x = pct, y = grp_edad,
-        group = metrica, fill = grp_edad)
+    df1,
+    aes(x = valor, y = grp_edad,
+        group = dimension, fill = grp_edad)
   ) +
     geom_col(show.legend = FALSE) +
-    geom_label(aes(label = sprintf("%.1f%%", 100 * pct)),
+    geom_label(aes(label = sprintf("%.1f%%", 100 * valor)),
                nudge_x = .025, size = 5,
                label.size = 0,
                label.padding = unit(0, "cm"),
@@ -269,7 +328,10 @@ mk_comb_plot <- function(df, dpto) {
       subtitle = "Rango de fechas: del 2020-03-06 al 2021-02-23. Población estimada al 2020 (INEI/MINSA).",
       caption = "Fuente: Datos abiertos de positivos y fallecidos por COVID-19 (MINSA)\n@jmcastagnetto, Jesus M. Castagnetto, 2021-02-26"
     ) +
-    facet_wrap(~metrica) +
+    facet_wrap(
+      ~dimension,
+      labeller = labeller(dimension = lbls)
+    ) +
     ggthemes::theme_few(24) +
     theme(
       panel.grid.major.y = element_line(color = "grey80", linetype = "dotted"),
@@ -288,7 +350,11 @@ for (dpto in dptos) {
   dpto_lbl <- str_to_lower(dpto) %>%
     str_replace_all(" ", "_")
   fn <- glue::glue("plots/20210226-{dpto_lbl}-poblacion-positivos-fallecidos-dist.png")
-  p1 <- mk_comb_plot(combinados_dpto_long, dpto)
+  p1 <- mk_comb_plot(
+    combinados_dpto_long_pct,
+    dpto,
+    combinados_dpto_lbls
+  )
   ggsave(
     plot = p1,
     width = 16,
