@@ -4,7 +4,7 @@
 
 Posibles sesgos a tomar en cuenta:
 
-- Los datos de positivos se parecen a una distribución de la población econímicamente activa (PEA), pues la estrategia ha sido hacer pruebas a sintomáticos.
+- Los datos de positivos se parecen a una distribución de la población económicamente activa (PEA), pues la estrategia ha sido hacer pruebas a sintomáticos.
 - Los datos de fallecidos son lo que han sido confirmados, y no incluye a casos posibles/sospechosos (eso está en SINADEF).
 
 Fuentes originales de datos:
