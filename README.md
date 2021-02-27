@@ -13,13 +13,13 @@ Fuentes originales de datos:
 
 ### Perú
 
-![Perú](plots/20211226-peru-poblacion-positivos-fallecidos-dist.png)
+![Perú](plots/20210226-peru-poblacion-positivos-fallecidos-dist.png)
 
 
 ### Lima
 
-![Lima](plots/20211226-lima-poblacion-positivos-fallecidos-dist.png)
+![Lima](plots/20210226-lima-poblacion-positivos-fallecidos-dist.png)
 
 ### Callao
 
-![Callao](plots/20211226-callao-poblacion-positivos-fallecidos-dist.png)
+![Callao](plots/20210226-callao-poblacion-positivos-fallecidos-dist.png)

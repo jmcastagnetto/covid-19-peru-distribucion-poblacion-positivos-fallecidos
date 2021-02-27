@@ -287,7 +287,7 @@ dptos <- unique(combinados_dpto$departamento)
 for (dpto in dptos) {
   dpto_lbl <- str_to_lower(dpto) %>%
     str_replace_all(" ", "_")
-  fn <- glue::glue("plots/20211226-{dpto_lbl}-poblacion-positivos-fallecidos-dist.png")
+  fn <- glue::glue("plots/20210226-{dpto_lbl}-poblacion-positivos-fallecidos-dist.png")
   p1 <- mk_comb_plot(combinados_dpto_long, dpto)
   ggsave(
     plot = p1,
